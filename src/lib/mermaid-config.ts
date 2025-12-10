@@ -18,23 +18,28 @@ export const initMermaid = () => {
 
 /**
  * 取得指定主題的 Mermaid themeVariables 配置
+ * @param themeName 主題名稱
+ * @param look 風格類型，handDrawn 模式下節點背景透明
  */
-export const getMermaidThemeVariables = (themeName: ThemeName) => {
+export const getMermaidThemeVariables = (themeName: ThemeName, look: LookType = 'classic') => {
   const theme = getTheme(themeName);
+  // handDrawn 模式下，節點背景使用整體背景色（看起來透明）
+  const nodeBackground = look === 'handDrawn' ? theme.background : theme.nodeBackground;
+
   return {
-    primaryColor: theme.nodeBackground,
+    primaryColor: nodeBackground,
     primaryTextColor: theme.textColor,
     primaryBorderColor: theme.nodeBorder,
     lineColor: theme.lineColor,
-    secondaryColor: theme.nodeBackground,
-    tertiaryColor: theme.nodeBackground,
+    secondaryColor: nodeBackground,
+    tertiaryColor: nodeBackground,
     background: theme.background,
-    mainBkg: theme.nodeBackground,
+    mainBkg: nodeBackground,
     nodeBorder: theme.nodeBorder,
-    clusterBkg: theme.nodeBackground,
+    clusterBkg: nodeBackground,
     clusterBorder: theme.clusterBorder,
     titleColor: theme.textColor,
-    edgeLabelBackground: theme.edgeLabelBackground,
+    edgeLabelBackground: look === 'handDrawn' ? theme.background : theme.edgeLabelBackground,
   };
 };
 
@@ -82,7 +87,7 @@ export const renderMermaidWithTheme = async (
       htmlLabels: true,
       curve: 'basis',
     },
-    themeVariables: getMermaidThemeVariables(themeName),
+    themeVariables: getMermaidThemeVariables(themeName, look),
     // handDrawn 模式下使用 Virgil 手寫字型
     ...(look === 'handDrawn' && {
       fontFamily: 'Virgil, Segoe UI Emoji, cursive',
