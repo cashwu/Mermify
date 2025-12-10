@@ -1,3 +1,5 @@
+import { Github } from 'lucide-react';
+
 export default function Header() {
   return (
     <header className="px-4 py-3 flex items-center justify-between bg-slate-800 border-b border-slate-700">
@@ -16,12 +18,21 @@ export default function Header() {
           <polyline points="3.29 7 12 12 20.71 7" />
           <line x1="12" y1="22" x2="12" y2="12" />
         </svg>
-        <h1 className="text-lg font-semibold text-white">Mermaid Motion</h1>
+        <h1 className="text-lg font-semibold text-white">Mermify</h1>
       </div>
       <div className="flex items-center gap-2">
         <span className="text-xs text-slate-400">
           Powered by TanStack + Mermaid.js
         </span>
+        <a
+          href="https://github.com/cashwu/Mermify"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-400 hover:text-white transition-colors"
+          title="GitHub Repository"
+        >
+          <Github className="w-5 h-5" />
+        </a>
       </div>
     </header>
   );
