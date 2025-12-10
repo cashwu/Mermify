@@ -9,19 +9,56 @@ interface ExportOptions {
 
 /**
  * 將 SVG 元素匯出為 APNG 動畫圖片
+ *
+ * 【重要】關於尺寸處理的說明：
+ * 瀏覽器將 SVG 載入為 Image 時，會使用 viewBox 的尺寸作為 naturalWidth/naturalHeight，
+ * 而不是 SVG 元素上設定的 width/height 屬性。
+ *
+ * 因此，為了避免圖片變形或出現空白：
+ * 1. Canvas 尺寸必須與 viewBox 尺寸一致
+ * 2. SVG 的 width/height 屬性必須與 viewBox 尺寸一致
+ * 3. 不要嘗試在這裡做縮放（scale），會導致圖片變形
+ * 4. 繪製時直接使用 ctx.drawImage(img, 0, 0)，不指定目標尺寸
+ *
+ * 如果需要更高解析度的輸出，應該在 Mermaid 渲染時就設定較大的尺寸，
+ * 而不是在匯出時縮放。
  */
 export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, scale = 2, backgroundColor = '#0f172a' } = options;
+  const { fps = 24, duration = 2, backgroundColor = '#0f172a' } = options;
   const totalFrames = Math.round(fps * duration);
   const frameDelay = 1000 / fps; // 毫秒
 
-  // 取得 SVG 實際顯示尺寸
-  const rect = svgElement.getBoundingClientRect();
-  const width = Math.round(rect.width * scale);
-  const height = Math.round(rect.height * scale);
+  // 【重要】從原始 SVG 的 viewBox 取得尺寸
+  // 這個尺寸決定了最終輸出圖片的大小，不要修改或縮放
+  const originalViewBox = svgElement.getAttribute('viewBox');
+  let contentX = 0;
+  let contentY = 0;
+  let contentWidth: number;
+  let contentHeight: number;
+
+  if (originalViewBox) {
+    const parts = originalViewBox.split(/\s+/).map(Number);
+    contentX = parts[0];
+    contentY = parts[1];
+    contentWidth = parts[2];
+    contentHeight = parts[3];
+  } else {
+    // fallback 到 getBBox（當 SVG 沒有 viewBox 時）
+    const bbox = svgElement.getBBox();
+    const padding = 20;
+    contentX = bbox.x - padding;
+    contentY = bbox.y - padding;
+    contentWidth = bbox.width + padding * 2;
+    contentHeight = bbox.height + padding * 2;
+  }
+
+  // 【重要】直接使用 viewBox 尺寸，不做任何縮放
+  // 嘗試縮放會導致圖片變形或出現空白區域
+  const width = Math.round(contentWidth);
+  const height = Math.round(contentHeight);
 
   // 建立 canvas
   const canvas = document.createElement('canvas');
@@ -42,8 +79,8 @@ export async function exportToAPNG(
     // 為每一幀建立新的 SVG 克隆
     const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
 
-    // 準備 SVG 以便匯出
-    prepareSvgForExport(clonedSvg, width, height, backgroundColor);
+    // 準備 SVG 以便匯出（不傳 scale，因為我們用原始尺寸）
+    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight);
 
     // 更新動畫狀態
     updateAnimationFrame(clonedSvg, progress, duration, pathsInfo);
@@ -102,16 +139,26 @@ function extractPathsInfo(svg: SVGSVGElement): PathInfo[] {
 
 /**
  * 準備 SVG 以便匯出
+ *
+ * 【重要】SVG 的 width/height 必須與 viewBox 尺寸一致
+ * 不要嘗試設定不同的 width/height 來縮放，這會導致圖片變形
  */
 function prepareSvgForExport(
   svg: SVGSVGElement,
-  width: number,
-  height: number,
-  backgroundColor: string
+  _width: number,
+  _height: number,
+  backgroundColor: string,
+  viewBoxX: number,
+  viewBoxY: number,
+  viewBoxWidth: number,
+  viewBoxHeight: number
 ): void {
-  // 設定尺寸和 namespace
-  svg.setAttribute('width', String(width));
-  svg.setAttribute('height', String(height));
+  // 【重要】viewBox 和 width/height 必須一致，否則會變形
+  svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
+  svg.setAttribute('width', String(viewBoxWidth));
+  svg.setAttribute('height', String(viewBoxHeight));
+  // 移除 preserveAspectRatio 避免任何額外的縮放行為
+  svg.removeAttribute('preserveAspectRatio');
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
 
@@ -275,6 +322,10 @@ function updateAnimationFrame(
 
 /**
  * 將 SVG 轉換為 ImageData（使用 data URL 避免跨域問題）
+ *
+ * 【重要】繪製時不要指定目標尺寸
+ * 使用 ctx.drawImage(img, 0, 0) 而不是 ctx.drawImage(img, 0, 0, width, height)
+ * 因為後者會強制縮放圖片，導致變形
  */
 async function svgToImageData(
   svg: SVGSVGElement,
@@ -293,7 +344,8 @@ async function svgToImageData(
 
     img.onload = () => {
       ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
+      // 【重要】直接繪製，不指定目標尺寸，避免變形
+      ctx.drawImage(img, 0, 0);
 
       const imageData = ctx.getImageData(0, 0, width, height);
       resolve(imageData.data);
