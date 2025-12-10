@@ -8,6 +8,84 @@ interface ExportOptions {
 }
 
 /**
+ * 從 viewBox 字串解析尺寸
+ *
+ * 【重要】這個函數用於計算 APNG 匯出的尺寸
+ * 回傳的尺寸必須直接用於 Canvas 和 SVG，不可縮放
+ */
+export interface ViewBoxDimensions {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 解析 SVG viewBox 字串
+ * @param viewBox - viewBox 字串，格式為 "x y width height"
+ * @returns 解析後的尺寸物件，如果解析失敗則回傳 null
+ */
+export function parseViewBox(viewBox: string | null): ViewBoxDimensions | null {
+  if (!viewBox) return null;
+
+  const parts = viewBox.split(/\s+/).map(Number);
+  if (parts.length !== 4 || parts.some(isNaN)) {
+    return null;
+  }
+
+  return {
+    x: parts[0],
+    y: parts[1],
+    width: parts[2],
+    height: parts[3],
+  };
+}
+
+/**
+ * 計算匯出尺寸
+ *
+ * 【重要】回傳的尺寸必須直接使用，不可縮放
+ * 瀏覽器載入 SVG 為 Image 時會使用 viewBox 尺寸作為 naturalWidth/naturalHeight
+ * 如果 Canvas 尺寸與 viewBox 不一致，會導致圖片變形或空白
+ *
+ * @param viewBox - 解析後的 viewBox 尺寸
+ * @returns Canvas 應該使用的寬高
+ */
+export function calculateExportDimensions(viewBox: ViewBoxDimensions): {
+  width: number;
+  height: number;
+} {
+  // 【重要】直接使用 viewBox 尺寸，四捨五入為整數
+  // 不要乘以任何 scale 係數
+  return {
+    width: Math.round(viewBox.width),
+    height: Math.round(viewBox.height),
+  };
+}
+
+/**
+ * 驗證匯出尺寸是否正確設定
+ * 用於確保 SVG width/height 與 viewBox 一致
+ */
+export function validateExportSetup(
+  svgWidth: number,
+  svgHeight: number,
+  viewBox: ViewBoxDimensions
+): { valid: boolean; error?: string } {
+  const expectedWidth = Math.round(viewBox.width);
+  const expectedHeight = Math.round(viewBox.height);
+
+  if (svgWidth !== expectedWidth || svgHeight !== expectedHeight) {
+    return {
+      valid: false,
+      error: `SVG 尺寸 (${svgWidth}x${svgHeight}) 與 viewBox 尺寸 (${expectedWidth}x${expectedHeight}) 不一致，會導致圖片變形`,
+    };
+  }
+
+  return { valid: true };
+}
+
+/**
  * 將 SVG 元素匯出為 APNG 動畫圖片
  *
  * 【重要】關於尺寸處理的說明：
@@ -34,17 +112,18 @@ export async function exportToAPNG(
   // 【重要】從原始 SVG 的 viewBox 取得尺寸
   // 這個尺寸決定了最終輸出圖片的大小，不要修改或縮放
   const originalViewBox = svgElement.getAttribute('viewBox');
-  let contentX = 0;
-  let contentY = 0;
+  const parsedViewBox = parseViewBox(originalViewBox);
+
+  let contentX: number;
+  let contentY: number;
   let contentWidth: number;
   let contentHeight: number;
 
-  if (originalViewBox) {
-    const parts = originalViewBox.split(/\s+/).map(Number);
-    contentX = parts[0];
-    contentY = parts[1];
-    contentWidth = parts[2];
-    contentHeight = parts[3];
+  if (parsedViewBox) {
+    contentX = parsedViewBox.x;
+    contentY = parsedViewBox.y;
+    contentWidth = parsedViewBox.width;
+    contentHeight = parsedViewBox.height;
   } else {
     // fallback 到 getBBox（當 SVG 沒有 viewBox 時）
     const bbox = svgElement.getBBox();
@@ -55,10 +134,14 @@ export async function exportToAPNG(
     contentHeight = bbox.height + padding * 2;
   }
 
-  // 【重要】直接使用 viewBox 尺寸，不做任何縮放
-  // 嘗試縮放會導致圖片變形或出現空白區域
-  const width = Math.round(contentWidth);
-  const height = Math.round(contentHeight);
+  // 【重要】使用 calculateExportDimensions 計算尺寸
+  // 此函數確保不會進行任何縮放
+  const { width, height } = calculateExportDimensions({
+    x: contentX,
+    y: contentY,
+    width: contentWidth,
+    height: contentHeight,
+  });
 
   // 建立 canvas
   const canvas = document.createElement('canvas');
