@@ -16,7 +16,6 @@
     "@tanstack/router-plugin": "^1.132.0",
     "lucide-react": "^0.545.0",
     "mermaid": "^11.12.2",
-    "nitro": "latest",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "upng-js": "^2.1.0",
