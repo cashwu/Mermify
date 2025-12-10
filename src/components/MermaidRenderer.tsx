@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
 import { initMermaid, renderMermaid } from '../lib/mermaid-config';
 import {
   injectAnimations,
@@ -11,15 +11,25 @@ interface MermaidRendererProps {
   code: string;
 }
 
+export interface MermaidRendererRef {
+  getSvgElement: () => SVGSVGElement | null;
+}
+
 // 初始化 mermaid
 let initialized = false;
 
-export function MermaidRenderer({ code }: MermaidRendererProps) {
+export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererProps>(
+  function MermaidRenderer({ code }, ref) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [renderKey, setRenderKey] = useState(0);
 
   const { isPlaying, speed, animationType } = useAnimationStore();
+
+  // 暴露 getSvgElement 方法給父組件
+  useImperativeHandle(ref, () => ({
+    getSvgElement: () => containerRef.current?.querySelector('svg') || null,
+  }));
 
   // 渲染 Mermaid 圖表
   const renderChart = useCallback(async () => {
@@ -93,4 +103,4 @@ export function MermaidRenderer({ code }: MermaidRendererProps) {
       className="w-full h-full flex items-center justify-center overflow-auto p-4"
     />
   );
-}
+})

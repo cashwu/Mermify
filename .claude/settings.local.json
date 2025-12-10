@@ -2,7 +2,15 @@
   "permissions": {
     "allow": [
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfix: fullscreen layout and add resizable split pane with animation support\n\n- Fix viewport overflow issue by adding overflow-hidden and min-h-0\n- Add draggable divider between code editor and preview panels\n- Adjust default split ratio to 30/70 (more space for preview)\n- Fix animation injection to support Mermaid 11.x SVG structure\n- Enhance CSS selectors for better compatibility across Mermaid versions\nEOF\n)\")"
+      "Bash(git commit -m \"$(cat <<''EOF''\nfix: fullscreen layout and add resizable split pane with animation support\n\n- Fix viewport overflow issue by adding overflow-hidden and min-h-0\n- Add draggable divider between code editor and preview panels\n- Adjust default split ratio to 30/70 (more space for preview)\n- Fix animation injection to support Mermaid 11.x SVG structure\n- Enhance CSS selectors for better compatibility across Mermaid versions\nEOF\n)\")",
+      "Bash(cat:*)",
+      "WebSearch",
+      "Bash(npm install:*)",
+      "Bash(npm show:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run build:*)",
+      "Bash(git reset:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

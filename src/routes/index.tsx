@@ -1,8 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { MermaidRenderer } from '../components/MermaidRenderer';
+import { MermaidRenderer, type MermaidRendererRef } from '../components/MermaidRenderer';
 import { CodeEditor } from '../components/CodeEditor';
 import { AnimationController } from '../components/AnimationController';
+import { ExportButton } from '../components/ExportButton';
 import { DEFAULT_MERMAID_CODE } from '../lib/mermaid-config';
 
 export const Route = createFileRoute('/')({
@@ -18,6 +19,7 @@ function App() {
   const [leftPanelWidth, setLeftPanelWidth] = useState(30);
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const mermaidRef = useRef<MermaidRendererRef>(null);
 
   // 防抖處理
   const handleCodeChange = useCallback((newCode: string) => {
@@ -107,11 +109,12 @@ function App() {
           className="flex flex-col bg-slate-900 min-w-0"
           style={{ width: `${100 - leftPanelWidth}%` }}
         >
-          <div className="px-4 py-2 bg-slate-800 border-b border-slate-700">
+          <div className="px-4 py-2 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
             <h2 className="text-sm font-medium text-slate-300">Preview</h2>
+            <ExportButton getSvgElement={() => mermaidRef.current?.getSvgElement() || null} />
           </div>
           <div className="flex-1 overflow-auto">
-            <MermaidRenderer code={debouncedCode} />
+            <MermaidRenderer ref={mermaidRef} code={debouncedCode} />
           </div>
         </div>
       </div>
