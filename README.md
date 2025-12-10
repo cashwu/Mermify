@@ -6,6 +6,8 @@
 ![React](https://img.shields.io/badge/react-19-blue)
 ![Vite](https://img.shields.io/badge/vite-7-purple)
 
+**[線上體驗](https://mermify.cashwu.com)**
+
 Mermify 是一個功能強大的網路應用程式，能將靜態的 Mermaid 圖表轉換為動態視覺化內容。透過即時編輯和可自訂的流動效果，它能幫助您建立引人入勝的圖表，清晰地展示流程和數據流。
 
 ## ✨ 功能特色
