@@ -1,6 +1,192 @@
 import UPNG from 'upng-js';
-import type { AnimationType } from '../stores/animation-store';
+import * as fontkit from 'fontkit';
+import type { AnimationType, LookType } from '../stores/animation-store';
 import { getTheme, type ThemeName, type ThemeColors } from './themes';
+
+// Fontkit 字型類型
+type FontkitFont = fontkit.Font;
+
+// Virgil 字型快取（使用 fontkit）
+let virgilFont: FontkitFont | null = null;
+
+/**
+ * 使用 fontkit 載入 Virgil 字型
+ * fontkit 支援 woff2 格式，可以將文字轉換為 SVG 路徑
+ */
+async function loadVirgilFontFontkit(): Promise<FontkitFont | null> {
+  if (virgilFont) return virgilFont;
+
+  try {
+    const response = await fetch('https://excalidraw.nyc3.cdn.digitaloceanspaces.com/fonts/Virgil.woff2');
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
+    const fontOrCollection = fontkit.create(buffer as Buffer);
+
+    // fontkit.create 可能回傳 Font 或 FontCollection
+    // 如果是 FontCollection，取第一個字型
+    if ('fonts' in fontOrCollection) {
+      virgilFont = fontOrCollection.fonts[0];
+    } else {
+      virgilFont = fontOrCollection;
+    }
+
+    return virgilFont;
+  } catch (error) {
+    console.error('Failed to load Virgil font with fontkit:', error);
+    return null;
+  }
+}
+
+/**
+ * 使用 fontkit 將文字轉換為 SVG path data
+ * fontkit 的 layout() 會回傳每個 glyph 的路徑和位置
+ */
+function textToPathData(font: FontkitFont, text: string, x: number, y: number, fontSize: number): string {
+  const run = font.layout(text);
+  const scale = fontSize / font.unitsPerEm;
+
+  let currentX = x;
+  const pathParts: string[] = [];
+
+  for (let i = 0; i < run.glyphs.length; i++) {
+    const glyph = run.glyphs[i];
+    const position = run.positions[i];
+
+    // 取得 glyph 的 SVG 路徑
+    const glyphPath = glyph.path.toSVG();
+
+    if (glyphPath) {
+      // 轉換路徑到正確位置（考慮縮放和位置偏移）
+      // SVG 路徑需要轉換座標
+      const transformedPath = transformSvgPath(
+        glyphPath,
+        currentX + position.xOffset * scale,
+        y + position.yOffset * scale,
+        scale
+      );
+      pathParts.push(transformedPath);
+    }
+
+    currentX += position.xAdvance * scale;
+  }
+
+  return pathParts.join(' ');
+}
+
+/**
+ * 轉換 SVG 路徑到指定位置和縮放
+ */
+function transformSvgPath(pathData: string, tx: number, ty: number, scale: number): string {
+  // SVG 路徑命令：M, L, H, V, C, S, Q, T, A, Z
+  // 需要轉換所有座標
+  return pathData.replace(
+    /([MLHVCSQTA])([^MLHVCSQTAZ]*)/gi,
+    (_match, cmd, args) => {
+      const upperCmd = cmd.toUpperCase();
+      const isRelative = cmd !== upperCmd;
+
+      if (upperCmd === 'Z') return cmd;
+
+      const numbers = args.trim().split(/[\s,]+/).map(Number);
+      const transformed: number[] = [];
+
+      switch (upperCmd) {
+        case 'M':
+        case 'L':
+        case 'T':
+          // x, y 座標對
+          for (let i = 0; i < numbers.length; i += 2) {
+            if (isRelative) {
+              transformed.push(numbers[i] * scale, numbers[i + 1] * -scale);
+            } else {
+              transformed.push(numbers[i] * scale + tx, numbers[i + 1] * -scale + ty);
+            }
+          }
+          break;
+        case 'H':
+          // 水平線 x
+          for (const n of numbers) {
+            transformed.push(isRelative ? n * scale : n * scale + tx);
+          }
+          break;
+        case 'V':
+          // 垂直線 y
+          for (const n of numbers) {
+            transformed.push(isRelative ? n * -scale : n * -scale + ty);
+          }
+          break;
+        case 'C':
+          // 三次貝茲曲線：x1, y1, x2, y2, x, y
+          for (let i = 0; i < numbers.length; i += 6) {
+            if (isRelative) {
+              transformed.push(
+                numbers[i] * scale, numbers[i + 1] * -scale,
+                numbers[i + 2] * scale, numbers[i + 3] * -scale,
+                numbers[i + 4] * scale, numbers[i + 5] * -scale
+              );
+            } else {
+              transformed.push(
+                numbers[i] * scale + tx, numbers[i + 1] * -scale + ty,
+                numbers[i + 2] * scale + tx, numbers[i + 3] * -scale + ty,
+                numbers[i + 4] * scale + tx, numbers[i + 5] * -scale + ty
+              );
+            }
+          }
+          break;
+        case 'S':
+        case 'Q':
+          // S: x2, y2, x, y / Q: x1, y1, x, y
+          for (let i = 0; i < numbers.length; i += 4) {
+            if (isRelative) {
+              transformed.push(
+                numbers[i] * scale, numbers[i + 1] * -scale,
+                numbers[i + 2] * scale, numbers[i + 3] * -scale
+              );
+            } else {
+              transformed.push(
+                numbers[i] * scale + tx, numbers[i + 1] * -scale + ty,
+                numbers[i + 2] * scale + tx, numbers[i + 3] * -scale + ty
+              );
+            }
+          }
+          break;
+        case 'A':
+          // 弧線：rx, ry, x-axis-rotation, large-arc-flag, sweep-flag, x, y
+          for (let i = 0; i < numbers.length; i += 7) {
+            transformed.push(
+              numbers[i] * scale,
+              numbers[i + 1] * scale,
+              numbers[i + 2],
+              numbers[i + 3],
+              numbers[i + 4]
+            );
+            if (isRelative) {
+              transformed.push(numbers[i + 5] * scale, numbers[i + 6] * -scale);
+            } else {
+              transformed.push(numbers[i + 5] * scale + tx, numbers[i + 6] * -scale + ty);
+            }
+          }
+          break;
+      }
+
+      return cmd + transformed.join(' ');
+    }
+  );
+}
+
+/**
+ * 計算文字在指定字型和大小下的寬度
+ */
+function measureTextWidth(font: FontkitFont, text: string, fontSize: number): number {
+  const run = font.layout(text);
+  const scale = fontSize / font.unitsPerEm;
+
+  let width = 0;
+  for (const position of run.positions) {
+    width += position.xAdvance * scale;
+  }
+  return width;
+}
 
 interface ExportOptions {
   fps?: number;
@@ -9,6 +195,7 @@ interface ExportOptions {
   backgroundColor?: string;
   animationType?: AnimationType; // 動畫類型：dash, particle, both
   theme?: ThemeName; // 主題配色
+  look?: LookType; // 風格：classic, handDrawn
 }
 
 /**
@@ -109,7 +296,16 @@ export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan' } = options;
+  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan', look = 'classic' } = options;
+  const fontFamily = look === 'handDrawn' ? 'Virgil, cursive' : 'Arial, sans-serif';
+
+  // 如果是手繪風格，使用 fontkit 載入 Virgil 字型
+  // 這樣可以將文字轉換為 SVG 路徑，避免 canvas 字型載入問題
+  let fontkitFont: FontkitFont | null = null;
+  if (look === 'handDrawn') {
+    fontkitFont = await loadVirgilFontFontkit();
+  }
+
   // 使用主題配色決定背景色
   const themeColors = getTheme(theme);
   const backgroundColor = options.backgroundColor || themeColors.background;
@@ -170,7 +366,7 @@ export async function exportToAPNG(
     const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
 
     // 準備 SVG 以便匯出（不傳 scale，因為我們用原始尺寸）
-    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight, themeColors);
+    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight, themeColors, fontFamily, fontkitFont);
 
     // 更新動畫狀態
     updateAnimationFrame(clonedSvg, progress, duration, pathsInfo, animationType, themeColors);
@@ -242,7 +438,9 @@ function prepareSvgForExport(
   viewBoxY: number,
   viewBoxWidth: number,
   viewBoxHeight: number,
-  themeColors: ThemeColors
+  themeColors: ThemeColors,
+  fontFamily: string,
+  fontkitFont: FontkitFont | null
 ): void {
   // 【重要】viewBox 和 width/height 必須一致，否則會變形
   svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
@@ -260,22 +458,30 @@ function prepareSvgForExport(
   bgRect.setAttribute('fill', backgroundColor);
   svg.insertBefore(bgRect, svg.firstChild);
 
-  // 處理 foreignObject 中的文字 - 轉換為 SVG text（使用主題的文字顏色）
-  convertForeignObjectsToText(svg, themeColors);
+  // 處理 foreignObject 中的文字 - 轉換為 SVG text 或 path（使用主題的文字顏色和指定字型）
+  // 如果有 fontkit 字型，則將文字轉為 SVG 路徑，避免 canvas 字型載入問題
+  convertForeignObjectsToText(svg, themeColors, fontFamily, fontkitFont);
 
   // 移除 SMIL 動畫元素（我們手動控制位置）
   const animateElements = svg.querySelectorAll('animateMotion, animate, animateTransform');
   animateElements.forEach((el) => el.remove());
 
-  // 內嵌樣式（使用主題配色）
-  inlineAllStyles(svg, themeColors);
+  // 內嵌樣式（使用主題配色和指定字型）
+  inlineAllStyles(svg, themeColors, fontFamily);
 }
 
 /**
- * 將 foreignObject 中的文字轉換為 SVG text 元素
+ * 將 foreignObject 中的文字轉換為 SVG text 或 path 元素
+ * 如果提供了 fontkit 字型，則轉換為 path 元素（避免 canvas 字型載入問題）
  */
-function convertForeignObjectsToText(svg: SVGSVGElement, themeColors: ThemeColors): void {
+function convertForeignObjectsToText(
+  svg: SVGSVGElement,
+  themeColors: ThemeColors,
+  fontFamily: string,
+  fontkitFont: FontkitFont | null
+): void {
   const foreignObjects = svg.querySelectorAll('foreignObject');
+  const fontSize = 14;
 
   foreignObjects.forEach((fo) => {
     const x = parseFloat(fo.getAttribute('x') || '0');
@@ -287,19 +493,41 @@ function convertForeignObjectsToText(svg: SVGSVGElement, themeColors: ThemeColor
     const textContent = fo.textContent?.trim() || '';
 
     if (textContent) {
-      // 建立 SVG text 元素
-      const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      textEl.setAttribute('x', String(x + foWidth / 2));
-      textEl.setAttribute('y', String(y + foHeight / 2 + 5)); // +5 調整垂直置中
-      textEl.setAttribute('text-anchor', 'middle');
-      textEl.setAttribute('dominant-baseline', 'middle');
-      textEl.setAttribute('fill', themeColors.textColor); // 使用主題文字顏色
-      textEl.setAttribute('font-family', 'Arial, sans-serif');
-      textEl.setAttribute('font-size', '14');
-      textEl.textContent = textContent;
+      if (fontkitFont) {
+        // 使用 fontkit 將文字轉換為 SVG path
+        // 計算文字寬度以置中
+        const textWidth = measureTextWidth(fontkitFont, textContent, fontSize);
+        // 計算置中位置
+        const textX = x + (foWidth - textWidth) / 2;
+        // y 位置：foreignObject 中心 + 字型基線調整
+        const textY = y + foHeight / 2 + fontSize * 0.35;
 
-      // 插入到 foreignObject 的位置
-      fo.parentNode?.insertBefore(textEl, fo);
+        // 取得路徑資料
+        const pathData = textToPathData(fontkitFont, textContent, textX, textY, fontSize);
+
+        // 建立 path 元素
+        const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        pathEl.setAttribute('d', pathData);
+        pathEl.setAttribute('fill', themeColors.textColor);
+        pathEl.setAttribute('stroke', 'none');
+
+        // 插入到 foreignObject 的位置
+        fo.parentNode?.insertBefore(pathEl, fo);
+      } else {
+        // 沒有 opentype 字型時，使用傳統 text 元素
+        const textEl = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        textEl.setAttribute('x', String(x + foWidth / 2));
+        textEl.setAttribute('y', String(y + foHeight / 2 + 5)); // +5 調整垂直置中
+        textEl.setAttribute('text-anchor', 'middle');
+        textEl.setAttribute('dominant-baseline', 'middle');
+        textEl.setAttribute('fill', themeColors.textColor);
+        textEl.setAttribute('font-family', fontFamily);
+        textEl.setAttribute('font-size', String(fontSize));
+        textEl.textContent = textContent;
+
+        // 插入到 foreignObject 的位置
+        fo.parentNode?.insertBefore(textEl, fo);
+      }
     }
 
     // 移除 foreignObject
@@ -308,9 +536,9 @@ function convertForeignObjectsToText(svg: SVGSVGElement, themeColors: ThemeColor
 }
 
 /**
- * 內嵌所有樣式（使用主題配色）
+ * 內嵌所有樣式（使用主題配色和指定字型）
  */
-function inlineAllStyles(svg: SVGSVGElement, themeColors: ThemeColors): void {
+function inlineAllStyles(svg: SVGSVGElement, themeColors: ThemeColors, fontFamily: string): void {
   // 先處理特定元素的樣式
 
   // 處理節點 (rect, polygon, circle 等)
@@ -355,7 +583,7 @@ function inlineAllStyles(svg: SVGSVGElement, themeColors: ThemeColors): void {
     if (!el.getAttribute('fill')) {
       el.setAttribute('fill', themeColors.textColor);
     }
-    el.setAttribute('font-family', 'Arial, sans-serif');
+    el.setAttribute('font-family', fontFamily);
   });
 
   // 處理粒子

@@ -47,6 +47,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
         duration: 2 / speed,
         animationType, // 傳入目前選擇的動畫類型
         theme, // 傳入目前選擇的主題
+        look, // 傳入目前選擇的風格
       });
 
       const filename = `mermaid-animation-${Date.now()}.png`;
