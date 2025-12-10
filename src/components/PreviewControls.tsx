@@ -1,7 +1,8 @@
-import { Download, Play, Pause, Loader2, Circle, Layers } from 'lucide-react';
+import { Download, Play, Pause, Loader2, Circle, Layers, Palette } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAnimationStore } from '../stores/animation-store';
 import { exportToAPNG, downloadBlob } from '../lib/export-apng';
+import { THEME_LIST } from '../lib/themes';
 
 interface PreviewControlsProps {
   getSvgElement: () => SVGSVGElement | null;
@@ -12,14 +13,19 @@ const SPEED_OPTIONS = [0.5, 1, 1.5, 2, 3];
 export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showThemeMenu, setShowThemeMenu] = useState(false);
   const speedMenuRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, speed, animationType, toggle, setSpeed, setType } = useAnimationStore();
+  const themeMenuRef = useRef<HTMLDivElement>(null);
+  const { isPlaying, speed, animationType, theme, toggle, setSpeed, setType, setTheme } = useAnimationStore();
 
-  // 點擊外部關閉速度選單
+  // 點擊外部關閉選單
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (speedMenuRef.current && !speedMenuRef.current.contains(e.target as Node)) {
         setShowSpeedMenu(false);
+      }
+      if (themeMenuRef.current && !themeMenuRef.current.contains(e.target as Node)) {
+        setShowThemeMenu(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -40,6 +46,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
         fps: 30,
         duration: 2 / speed,
         animationType, // 傳入目前選擇的動畫類型
+        theme, // 傳入目前選擇的主題
       });
 
       const filename = `mermaid-animation-${Date.now()}.png`;
@@ -67,6 +74,67 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
           <Download className="w-5 h-5 text-white" />
         )}
       </button>
+
+      {/* 主題選擇器 */}
+      <div className="relative" ref={themeMenuRef}>
+        <button
+          onClick={() => setShowThemeMenu(!showThemeMenu)}
+          className="w-10 h-10 flex items-center justify-center bg-slate-800/90 hover:bg-slate-700 rounded-lg transition-colors border border-slate-600"
+          title="選擇主題配色"
+        >
+          <Palette className="w-5 h-5 text-slate-300" />
+        </button>
+
+        {/* 主題選單 */}
+        {showThemeMenu && (
+          <div className="absolute right-12 top-0 bg-slate-800 border border-slate-600 rounded-lg shadow-lg overflow-hidden min-w-[140px]">
+            {/* 深色主題 */}
+            <div className="px-2 py-1 text-xs text-slate-500 border-b border-slate-700">深色主題</div>
+            {THEME_LIST.filter((t) => t.isDark).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setTheme(t.id);
+                  setShowThemeMenu(false);
+                }}
+                className={`w-full px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
+                  theme === t.id
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <span
+                  className="w-3 h-3 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: t.lineColor }}
+                />
+                <span>{t.name}</span>
+              </button>
+            ))}
+            {/* 淺色主題 */}
+            <div className="px-2 py-1 text-xs text-slate-500 border-t border-b border-slate-700">淺色主題</div>
+            {THEME_LIST.filter((t) => !t.isDark).map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setTheme(t.id);
+                  setShowThemeMenu(false);
+                }}
+                className={`w-full px-3 py-2 flex items-center gap-2 text-sm transition-colors ${
+                  theme === t.id
+                    ? 'bg-sky-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-700'
+                }`}
+              >
+                <span
+                  className="w-3 h-3 rounded-full flex-shrink-0 border border-slate-600"
+                  style={{ backgroundColor: t.lineColor }}
+                />
+                <span>{t.name}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* 分隔線 */}
       <div className="h-px bg-slate-600 my-1" />

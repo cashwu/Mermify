@@ -1,4 +1,5 @@
 import type { AnimationType } from '../../stores/animation-store';
+import { getTheme, type ThemeName } from '../themes';
 
 /**
  * 取得所有 edge path 元素 - 支援多種 Mermaid 版本的 SVG 結構
@@ -49,18 +50,22 @@ export function injectDashAnimation(svg: SVGElement, speed: number = 1): void {
 
 /**
  * 為 SVG 的 edge path 注入粒子移動動畫
+ * @param svg SVG 元素
+ * @param speed 動畫速度
+ * @param themeName 主題名稱（用於決定粒子顏色）
  */
-export function injectParticleAnimation(svg: SVGElement, speed: number = 1): void {
+export function injectParticleAnimation(svg: SVGElement, speed: number = 1, themeName: ThemeName = 'dark-cyan'): void {
   const edges = getEdgePaths(svg);
+  const themeColors = getTheme(themeName);
 
   edges.forEach((el, index) => {
     const pathId = `edge-path-${index}-${Date.now()}`;
     el.setAttribute('id', pathId);
 
-    // 創建流動粒子
+    // 創建流動粒子（使用主題的粒子顏色）
     const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
     circle.setAttribute('r', '4');
-    circle.setAttribute('fill', '#0ea5e9');
+    circle.setAttribute('fill', themeColors.particleColor);
     circle.setAttribute('class', 'flow-particle');
 
     // 創建動畫
@@ -102,11 +107,16 @@ export function clearAnimations(svg: SVGElement): void {
 
 /**
  * 根據動畫類型注入對應的動畫效果
+ * @param svg SVG 元素
+ * @param type 動畫類型
+ * @param speed 動畫速度
+ * @param themeName 主題名稱（用於粒子顏色）
  */
 export function injectAnimations(
   svg: SVGElement,
   type: AnimationType,
-  speed: number = 1
+  speed: number = 1,
+  themeName: ThemeName = 'dark-cyan'
 ): void {
   // 先清除現有動畫
   clearAnimations(svg);
@@ -117,7 +127,7 @@ export function injectAnimations(
   }
 
   if (type === 'particle' || type === 'both') {
-    injectParticleAnimation(svg, speed);
+    injectParticleAnimation(svg, speed, themeName);
   }
 }
 

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from 'react';
-import { initMermaid, renderMermaid } from '../lib/mermaid-config';
+import { initMermaid, renderMermaidWithTheme } from '../lib/mermaid-config';
 import {
   injectAnimations,
   setAnimationPlayState,
   updateAnimationSpeed,
 } from '../lib/animations/inject-animations';
 import { useAnimationStore } from '../stores/animation-store';
+import { getTheme } from '../lib/themes';
 
 interface MermaidRendererProps {
   code: string;
@@ -40,7 +41,8 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
   const dragStartRef = useRef({ x: 0, y: 0 });
   const positionStartRef = useRef({ x: 0, y: 0 });
 
-  const { isPlaying, speed, animationType } = useAnimationStore();
+  const { isPlaying, speed, animationType, theme } = useAnimationStore();
+  const themeColors = getTheme(theme);
 
   // 縮放控制函數
   const zoomIn = useCallback(() => {
@@ -113,32 +115,33 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
 
       setError(null);
       const id = `mermaid-${Date.now()}`;
-      const svg = await renderMermaid(code, id);
+      // 使用主題渲染圖表
+      const svg = await renderMermaidWithTheme(code, id, theme);
 
       if (containerRef.current) {
         containerRef.current.innerHTML = svg;
 
-        // 注入動畫
+        // 注入動畫（傳入主題以設定粒子顏色）
         const svgElement = containerRef.current.querySelector('svg');
         if (svgElement) {
-          injectAnimations(svgElement, animationType, speed);
+          injectAnimations(svgElement, animationType, speed, theme);
           setAnimationPlayState(svgElement, isPlaying);
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
-  }, [code, animationType, speed]);
+  }, [code, animationType, speed, theme]);
 
   // 當 code 或 animationType 改變時重新渲染
   useEffect(() => {
     renderChart();
   }, [renderChart, renderKey]);
 
-  // 當動畫類型改變時觸發重新渲染
+  // 當動畫類型或主題改變時觸發重新渲染
   useEffect(() => {
     setRenderKey((k) => k + 1);
-  }, [animationType]);
+  }, [animationType, theme]);
 
   // 當播放狀態改變時更新
   useEffect(() => {
@@ -169,14 +172,17 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
 
   return (
     <div
-      className="w-full h-full overflow-hidden relative"
+      className="w-full h-full overflow-hidden relative transition-colors duration-200"
       onWheel={handleWheel}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
       onDoubleClick={handleDoubleClick}
-      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+      style={{
+        cursor: isDragging ? 'grabbing' : 'grab',
+        backgroundColor: themeColors.background,
+      }}
     >
       <div
         ref={containerRef}

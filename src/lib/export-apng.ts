@@ -1,5 +1,6 @@
 import UPNG from 'upng-js';
 import type { AnimationType } from '../stores/animation-store';
+import { getTheme, type ThemeName, type ThemeColors } from './themes';
 
 interface ExportOptions {
   fps?: number;
@@ -7,6 +8,7 @@ interface ExportOptions {
   scale?: number;
   backgroundColor?: string;
   animationType?: AnimationType; // 動畫類型：dash, particle, both
+  theme?: ThemeName; // 主題配色
 }
 
 /**
@@ -107,7 +109,10 @@ export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, backgroundColor = '#0f172a', animationType = 'both' } = options;
+  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan' } = options;
+  // 使用主題配色決定背景色
+  const themeColors = getTheme(theme);
+  const backgroundColor = options.backgroundColor || themeColors.background;
   const totalFrames = Math.round(fps * duration);
   const frameDelay = 1000 / fps; // 毫秒
 
@@ -165,10 +170,10 @@ export async function exportToAPNG(
     const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
 
     // 準備 SVG 以便匯出（不傳 scale，因為我們用原始尺寸）
-    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight);
+    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight, themeColors);
 
     // 更新動畫狀態
-    updateAnimationFrame(clonedSvg, progress, duration, pathsInfo, animationType);
+    updateAnimationFrame(clonedSvg, progress, duration, pathsInfo, animationType, themeColors);
 
     // 將 SVG 轉換為圖片
     const imageData = await svgToImageData(clonedSvg, width, height, ctx);
@@ -236,7 +241,8 @@ function prepareSvgForExport(
   viewBoxX: number,
   viewBoxY: number,
   viewBoxWidth: number,
-  viewBoxHeight: number
+  viewBoxHeight: number,
+  themeColors: ThemeColors
 ): void {
   // 【重要】viewBox 和 width/height 必須一致，否則會變形
   svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
@@ -254,21 +260,21 @@ function prepareSvgForExport(
   bgRect.setAttribute('fill', backgroundColor);
   svg.insertBefore(bgRect, svg.firstChild);
 
-  // 處理 foreignObject 中的文字 - 轉換為 SVG text
-  convertForeignObjectsToText(svg);
+  // 處理 foreignObject 中的文字 - 轉換為 SVG text（使用主題的文字顏色）
+  convertForeignObjectsToText(svg, themeColors);
 
   // 移除 SMIL 動畫元素（我們手動控制位置）
   const animateElements = svg.querySelectorAll('animateMotion, animate, animateTransform');
   animateElements.forEach((el) => el.remove());
 
-  // 內嵌樣式
-  inlineAllStyles(svg);
+  // 內嵌樣式（使用主題配色）
+  inlineAllStyles(svg, themeColors);
 }
 
 /**
  * 將 foreignObject 中的文字轉換為 SVG text 元素
  */
-function convertForeignObjectsToText(svg: SVGSVGElement): void {
+function convertForeignObjectsToText(svg: SVGSVGElement, themeColors: ThemeColors): void {
   const foreignObjects = svg.querySelectorAll('foreignObject');
 
   foreignObjects.forEach((fo) => {
@@ -287,7 +293,7 @@ function convertForeignObjectsToText(svg: SVGSVGElement): void {
       textEl.setAttribute('y', String(y + foHeight / 2 + 5)); // +5 調整垂直置中
       textEl.setAttribute('text-anchor', 'middle');
       textEl.setAttribute('dominant-baseline', 'middle');
-      textEl.setAttribute('fill', '#f1f5f9');
+      textEl.setAttribute('fill', themeColors.textColor); // 使用主題文字顏色
       textEl.setAttribute('font-family', 'Arial, sans-serif');
       textEl.setAttribute('font-size', '14');
       textEl.textContent = textContent;
@@ -302,28 +308,28 @@ function convertForeignObjectsToText(svg: SVGSVGElement): void {
 }
 
 /**
- * 內嵌所有樣式
+ * 內嵌所有樣式（使用主題配色）
  */
-function inlineAllStyles(svg: SVGSVGElement): void {
+function inlineAllStyles(svg: SVGSVGElement, themeColors: ThemeColors): void {
   // 先處理特定元素的樣式
 
   // 處理節點 (rect, polygon, circle 等)
   const nodes = svg.querySelectorAll('.node rect, .node polygon, .node circle, .nodes rect');
   nodes.forEach((el) => {
     const computed = window.getComputedStyle(el);
-    // 保留原有的 fill，如果沒有則使用預設
+    // 保留原有的 fill，如果沒有則使用主題節點背景色
     if (!el.getAttribute('fill') || el.getAttribute('fill') === 'none') {
-      el.setAttribute('fill', computed.fill || '#1e293b');
+      el.setAttribute('fill', computed.fill || themeColors.nodeBackground);
     }
-    // 設定邊框
-    el.setAttribute('stroke', '#0ea5e9');
+    // 設定邊框（使用主題顏色）
+    el.setAttribute('stroke', themeColors.nodeBorder);
     el.setAttribute('stroke-width', '2');
   });
 
   // 處理連接線 (edge paths)
   const edgePaths = svg.querySelectorAll('.edgePath path, path.flowchart-link, path[marker-end]');
   edgePaths.forEach((el) => {
-    el.setAttribute('stroke', '#0ea5e9');
+    el.setAttribute('stroke', themeColors.lineColor);
     el.setAttribute('stroke-width', '2');
     el.setAttribute('fill', 'none');
   });
@@ -331,15 +337,15 @@ function inlineAllStyles(svg: SVGSVGElement): void {
   // 處理箭頭 marker
   const markers = svg.querySelectorAll('marker path, marker polygon');
   markers.forEach((el) => {
-    el.setAttribute('fill', '#0ea5e9');
-    el.setAttribute('stroke', '#0ea5e9');
+    el.setAttribute('fill', themeColors.lineColor);
+    el.setAttribute('stroke', themeColors.lineColor);
   });
 
   // 處理 edge labels
   const edgeLabels = svg.querySelectorAll('.edgeLabel rect, .edgeLabel span, .edgeLabel');
   edgeLabels.forEach((el) => {
     if (el.tagName === 'rect') {
-      el.setAttribute('fill', '#1e293b');
+      el.setAttribute('fill', themeColors.edgeLabelBackground);
     }
   });
 
@@ -347,7 +353,7 @@ function inlineAllStyles(svg: SVGSVGElement): void {
   const texts = svg.querySelectorAll('text, tspan');
   texts.forEach((el) => {
     if (!el.getAttribute('fill')) {
-      el.setAttribute('fill', '#f1f5f9');
+      el.setAttribute('fill', themeColors.textColor);
     }
     el.setAttribute('font-family', 'Arial, sans-serif');
   });
@@ -355,7 +361,7 @@ function inlineAllStyles(svg: SVGSVGElement): void {
   // 處理粒子
   const particles = svg.querySelectorAll('.flow-particle');
   particles.forEach((el) => {
-    el.setAttribute('fill', '#0ea5e9');
+    el.setAttribute('fill', themeColors.particleColor);
   });
 
   // 移除所有 style 元素（避免外部依賴）
@@ -364,14 +370,15 @@ function inlineAllStyles(svg: SVGSVGElement): void {
 
 /**
  * 更新動畫幀
- * 根據 animationType 決定要渲染哪種動畫效果
+ * 根據 animationType 決定要渲染哪種動畫效果（使用主題配色）
  */
 function updateAnimationFrame(
   svg: SVGSVGElement,
   progress: number,
   duration: number,
   pathsInfo: PathInfo[],
-  animationType: AnimationType
+  animationType: AnimationType,
+  themeColors: ThemeColors
 ): void {
   const showDash = animationType === 'dash' || animationType === 'both';
   const showParticle = animationType === 'particle' || animationType === 'both';
@@ -406,8 +413,8 @@ function updateAnimationFrame(
         (particle as SVGCircleElement).setAttribute('cx', String(point.x));
         (particle as SVGCircleElement).setAttribute('cy', String(point.y));
 
-        // 確保粒子樣式和可見性
-        particle.setAttribute('fill', '#0ea5e9');
+        // 確保粒子樣式和可見性（使用主題的粒子顏色）
+        particle.setAttribute('fill', themeColors.particleColor);
         particle.setAttribute('r', '4');
         particle.setAttribute('opacity', '1');
       } finally {
