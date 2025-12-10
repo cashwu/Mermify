@@ -10,7 +10,8 @@
       "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
       "Bash(git reset:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "WebFetch(domain:mermaid.js.org)"
     ]
   }
 }

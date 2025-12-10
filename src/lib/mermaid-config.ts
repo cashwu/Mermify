@@ -4,6 +4,7 @@ export const initMermaid = () => {
   mermaid.initialize({
     startOnLoad: false,
     theme: 'dark',
+    securityLevel: 'loose',
     flowchart: {
       useMaxWidth: true,
       htmlLabels: true,
