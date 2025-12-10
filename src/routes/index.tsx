@@ -2,8 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { MermaidRenderer, type MermaidRendererRef } from '../components/MermaidRenderer';
 import { CodeEditor } from '../components/CodeEditor';
-import { AnimationController } from '../components/AnimationController';
-import { ExportButton } from '../components/ExportButton';
+import { PreviewControls } from '../components/PreviewControls';
 import { ZoomControls } from '../components/ZoomControls';
 import { DEFAULT_MERMAID_CODE } from '../lib/mermaid-config';
 
@@ -123,12 +122,14 @@ function App() {
           className="flex flex-col bg-slate-900 min-w-0"
           style={{ width: `${100 - leftPanelWidth}%` }}
         >
-          <div className="px-4 py-2 bg-slate-800 border-b border-slate-700 flex items-center justify-between">
+          <div className="px-4 py-2 bg-slate-800 border-b border-slate-700">
             <h2 className="text-sm font-medium text-slate-300">Preview</h2>
-            <ExportButton getSvgElement={() => mermaidRef.current?.getSvgElement() || null} />
           </div>
           <div className="flex-1 overflow-hidden relative">
             <MermaidRenderer ref={mermaidRef} code={debouncedCode} />
+            {/* 右上角：動畫控制 + 匯出 */}
+            <PreviewControls getSvgElement={() => mermaidRef.current?.getSvgElement() || null} />
+            {/* 右下角：縮放控制 */}
             <ZoomControls
               scale={displayScale}
               onZoomIn={() => mermaidRef.current?.zoomIn()}
@@ -138,9 +139,6 @@ function App() {
           </div>
         </div>
       </div>
-
-      {/* Bottom - Animation Controller */}
-      <AnimationController />
     </div>
   );
 }
