@@ -4,6 +4,7 @@ import { MermaidRenderer, type MermaidRendererRef } from '../components/MermaidR
 import { CodeEditor } from '../components/CodeEditor';
 import { AnimationController } from '../components/AnimationController';
 import { ExportButton } from '../components/ExportButton';
+import { ZoomControls } from '../components/ZoomControls';
 import { DEFAULT_MERMAID_CODE } from '../lib/mermaid-config';
 
 export const Route = createFileRoute('/')({
@@ -20,6 +21,19 @@ function App() {
   const isDraggingRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const mermaidRef = useRef<MermaidRendererRef>(null);
+
+  // 縮放狀態（用於顯示在 ZoomControls）
+  const [displayScale, setDisplayScale] = useState(1);
+
+  // 定期更新顯示的縮放比例
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (mermaidRef.current) {
+        setDisplayScale(mermaidRef.current.getScale());
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // 防抖處理
   const handleCodeChange = useCallback((newCode: string) => {
@@ -113,8 +127,14 @@ function App() {
             <h2 className="text-sm font-medium text-slate-300">Preview</h2>
             <ExportButton getSvgElement={() => mermaidRef.current?.getSvgElement() || null} />
           </div>
-          <div className="flex-1 overflow-auto">
+          <div className="flex-1 overflow-hidden relative">
             <MermaidRenderer ref={mermaidRef} code={debouncedCode} />
+            <ZoomControls
+              scale={displayScale}
+              onZoomIn={() => mermaidRef.current?.zoomIn()}
+              onZoomOut={() => mermaidRef.current?.zoomOut()}
+              onReset={() => mermaidRef.current?.resetZoom()}
+            />
           </div>
         </div>
       </div>

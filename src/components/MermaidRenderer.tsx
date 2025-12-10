@@ -13,10 +13,19 @@ interface MermaidRendererProps {
 
 export interface MermaidRendererRef {
   getSvgElement: () => SVGSVGElement | null;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+  getScale: () => number;
 }
 
 // 初始化 mermaid
 let initialized = false;
+
+// 縮放設定
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 3;
+const ZOOM_STEP = 0.1;
 
 export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererProps>(
   function MermaidRenderer({ code }, ref) {
@@ -24,12 +33,73 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
   const [error, setError] = useState<string | null>(null);
   const [renderKey, setRenderKey] = useState(0);
 
+  // 縮放和拖曳狀態
+  const [scale, setScale] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const positionStartRef = useRef({ x: 0, y: 0 });
+
   const { isPlaying, speed, animationType } = useAnimationStore();
 
-  // 暴露 getSvgElement 方法給父組件
+  // 縮放控制函數
+  const zoomIn = useCallback(() => {
+    setScale((s) => Math.min(MAX_SCALE, s + ZOOM_STEP));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setScale((s) => Math.max(MIN_SCALE, s - ZOOM_STEP));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setScale(1);
+    setPosition({ x: 0, y: 0 });
+  }, []);
+
+  // 暴露方法給父組件
   useImperativeHandle(ref, () => ({
     getSvgElement: () => containerRef.current?.querySelector('svg') || null,
+    zoomIn,
+    zoomOut,
+    resetZoom,
+    getScale: () => scale,
   }));
+
+  // 滾輪縮放
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+    setScale((s) => Math.min(MAX_SCALE, Math.max(MIN_SCALE, s + delta)));
+  }, []);
+
+  // 開始拖曳
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return; // 只處理左鍵
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX, y: e.clientY };
+    positionStartRef.current = { ...position };
+  }, [position]);
+
+  // 拖曳中
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStartRef.current.x;
+    const dy = e.clientY - dragStartRef.current.y;
+    setPosition({
+      x: positionStartRef.current.x + dx,
+      y: positionStartRef.current.y + dy,
+    });
+  }, [isDragging]);
+
+  // 結束拖曳
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // 雙擊重置
+  const handleDoubleClick = useCallback(() => {
+    resetZoom();
+  }, [resetZoom]);
 
   // 渲染 Mermaid 圖表
   const renderChart = useCallback(async () => {
@@ -99,8 +169,24 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
 
   return (
     <div
-      ref={containerRef}
-      className="w-full h-full flex items-center justify-center overflow-auto p-4"
-    />
+      className="w-full h-full overflow-hidden relative"
+      onWheel={handleWheel}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      onDoubleClick={handleDoubleClick}
+      style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+    >
+      <div
+        ref={containerRef}
+        className="w-full h-full flex items-center justify-center"
+        style={{
+          transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+          transformOrigin: 'center center',
+          transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+        }}
+      />
+    </div>
   );
 })
