@@ -21,9 +21,6 @@ export default function Header() {
         <h1 className="text-lg font-semibold text-white">Mermify</h1>
       </div>
       <div className="flex items-center gap-2">
-        <span className="text-xs text-slate-400">
-          Powered by TanStack + Mermaid.js
-        </span>
         <a
           href="https://github.com/cashwu/Mermify"
           target="_blank"
