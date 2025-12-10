@@ -1,10 +1,12 @@
 import UPNG from 'upng-js';
+import type { AnimationType } from '../stores/animation-store';
 
 interface ExportOptions {
   fps?: number;
   duration?: number; // 總動畫時長（秒）
   scale?: number;
   backgroundColor?: string;
+  animationType?: AnimationType; // 動畫類型：dash, particle, both
 }
 
 /**
@@ -105,7 +107,7 @@ export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, backgroundColor = '#0f172a' } = options;
+  const { fps = 24, duration = 2, backgroundColor = '#0f172a', animationType = 'both' } = options;
   const totalFrames = Math.round(fps * duration);
   const frameDelay = 1000 / fps; // 毫秒
 
@@ -166,7 +168,7 @@ export async function exportToAPNG(
     prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight);
 
     // 更新動畫狀態
-    updateAnimationFrame(clonedSvg, progress, duration, pathsInfo);
+    updateAnimationFrame(clonedSvg, progress, duration, pathsInfo, animationType);
 
     // 將 SVG 轉換為圖片
     const imageData = await svgToImageData(clonedSvg, width, height, ctx);
@@ -362,26 +364,37 @@ function inlineAllStyles(svg: SVGSVGElement): void {
 
 /**
  * 更新動畫幀
+ * 根據 animationType 決定要渲染哪種動畫效果
  */
 function updateAnimationFrame(
   svg: SVGSVGElement,
   progress: number,
   duration: number,
-  pathsInfo: PathInfo[]
+  pathsInfo: PathInfo[],
+  animationType: AnimationType
 ): void {
-  // 更新虛線動畫 (dash-flow)
-  const dashFlowElements = svg.querySelectorAll('[class*="dash-flow"], path[marker-end]');
-  dashFlowElements.forEach((el) => {
-    // 設定虛線樣式
-    el.setAttribute('stroke-dasharray', '10 5');
-    const offset = 15 - ((progress * 15 * duration * 2) % 15);
-    el.setAttribute('stroke-dashoffset', String(offset));
+  const showDash = animationType === 'dash' || animationType === 'both';
+  const showParticle = animationType === 'particle' || animationType === 'both';
+
+  // 更新虛線動畫 (dash-flow) - 只在 dash 或 both 模式
+  const edgePaths = svg.querySelectorAll('[class*="dash-flow"], path[marker-end]');
+  edgePaths.forEach((el) => {
+    if (showDash) {
+      // 設定虛線樣式和動畫
+      el.setAttribute('stroke-dasharray', '10 5');
+      const offset = 15 - ((progress * 15 * duration * 2) % 15);
+      el.setAttribute('stroke-dashoffset', String(offset));
+    } else {
+      // particle 模式：實線，不要虛線
+      el.removeAttribute('stroke-dasharray');
+      el.removeAttribute('stroke-dashoffset');
+    }
   });
 
-  // 更新粒子位置
+  // 更新粒子位置 - 只在 particle 或 both 模式
   const particles = svg.querySelectorAll('.flow-particle');
   particles.forEach((particle, index) => {
-    if (pathsInfo[index]) {
+    if (showParticle && pathsInfo[index]) {
       // 使用臨時 path 來計算位置
       const tempPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
       tempPath.setAttribute('d', pathsInfo[index].pathData);
@@ -393,12 +406,16 @@ function updateAnimationFrame(
         (particle as SVGCircleElement).setAttribute('cx', String(point.x));
         (particle as SVGCircleElement).setAttribute('cy', String(point.y));
 
-        // 確保粒子樣式
+        // 確保粒子樣式和可見性
         particle.setAttribute('fill', '#0ea5e9');
         particle.setAttribute('r', '4');
+        particle.setAttribute('opacity', '1');
       } finally {
         document.body.removeChild(tempPath);
       }
+    } else {
+      // dash 模式：隱藏粒子
+      particle.setAttribute('opacity', '0');
     }
   });
 }

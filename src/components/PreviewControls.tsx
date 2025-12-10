@@ -39,7 +39,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
       const blob = await exportToAPNG(svgElement, {
         fps: 30,
         duration: 2 / speed,
-        scale: 2,
+        animationType, // 傳入目前選擇的動畫類型
       });
 
       const filename = `mermaid-animation-${Date.now()}.png`;
