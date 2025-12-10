@@ -1,4 +1,4 @@
-import { Download, Play, Pause, Loader2, Circle, Layers, Palette } from 'lucide-react';
+import { Download, Play, Pause, Loader2, Circle, Layers, Palette, Pencil } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAnimationStore } from '../stores/animation-store';
 import { exportToAPNG, downloadBlob } from '../lib/export-apng';
@@ -16,7 +16,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const speedMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
-  const { isPlaying, speed, animationType, theme, toggle, setSpeed, setType, setTheme } = useAnimationStore();
+  const { isPlaying, speed, animationType, theme, look, toggle, setSpeed, setType, setTheme, setLook } = useAnimationStore();
 
   // 點擊外部關閉選單
   useEffect(() => {
@@ -135,6 +135,19 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
           </div>
         )}
       </div>
+
+      {/* 手繪風格切換按鈕 */}
+      <button
+        onClick={() => setLook(look === 'classic' ? 'handDrawn' : 'classic')}
+        className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors border ${
+          look === 'handDrawn'
+            ? 'bg-sky-600 border-sky-500 text-white'
+            : 'bg-slate-800/90 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+        }`}
+        title={look === 'handDrawn' ? '手繪風格（點擊關閉）' : '手繪風格（點擊開啟）'}
+      >
+        <Pencil className="w-5 h-5" />
+      </button>
 
       {/* 分隔線 */}
       <div className="h-px bg-slate-600 my-1" />

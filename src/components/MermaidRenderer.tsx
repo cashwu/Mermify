@@ -41,7 +41,7 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
   const dragStartRef = useRef({ x: 0, y: 0 });
   const positionStartRef = useRef({ x: 0, y: 0 });
 
-  const { isPlaying, speed, animationType, theme } = useAnimationStore();
+  const { isPlaying, speed, animationType, theme, look } = useAnimationStore();
   const themeColors = getTheme(theme);
 
   // 縮放控制函數
@@ -115,8 +115,8 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
 
       setError(null);
       const id = `mermaid-${Date.now()}`;
-      // 使用主題渲染圖表
-      const svg = await renderMermaidWithTheme(code, id, theme);
+      // 使用主題和風格渲染圖表
+      const svg = await renderMermaidWithTheme(code, id, theme, look);
 
       if (containerRef.current) {
         containerRef.current.innerHTML = svg;
@@ -131,17 +131,17 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to render diagram');
     }
-  }, [code, animationType, speed, theme]);
+  }, [code, animationType, speed, theme, look]);
 
   // 當 code 或 animationType 改變時重新渲染
   useEffect(() => {
     renderChart();
   }, [renderChart, renderKey]);
 
-  // 當動畫類型或主題改變時觸發重新渲染
+  // 當動畫類型、主題或風格改變時觸發重新渲染
   useEffect(() => {
     setRenderKey((k) => k + 1);
-  }, [animationType, theme]);
+  }, [animationType, theme, look]);
 
   // 當播放狀態改變時更新
   useEffect(() => {

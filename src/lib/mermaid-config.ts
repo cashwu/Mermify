@@ -1,5 +1,6 @@
 import mermaid from 'mermaid';
 import { getTheme, type ThemeName } from './themes';
+import type { LookType } from '../stores/animation-store';
 
 export const initMermaid = () => {
   // 基本初始化，使用預設深色主題
@@ -65,7 +66,8 @@ export const renderMermaid = async (code: string, id: string): Promise<string> =
 export const renderMermaidWithTheme = async (
   code: string,
   id: string,
-  themeName: ThemeName
+  themeName: ThemeName,
+  look: LookType = 'classic'
 ): Promise<string> => {
   const theme = getTheme(themeName);
 
@@ -74,12 +76,17 @@ export const renderMermaidWithTheme = async (
     startOnLoad: false,
     theme: theme.isDark ? 'dark' : 'default',
     securityLevel: 'loose',
+    look: look,
     flowchart: {
       useMaxWidth: true,
       htmlLabels: true,
       curve: 'basis',
     },
     themeVariables: getMermaidThemeVariables(themeName),
+    // handDrawn 模式下使用 Virgil 手寫字型
+    ...(look === 'handDrawn' && {
+      fontFamily: 'Virgil, Segoe UI Emoji, cursive',
+    }),
   });
 
   try {
