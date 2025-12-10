@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+body {
+  @apply m-0 bg-slate-900 text-slate-100;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
+    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
+    monospace;
+}
+
+/* ===== SVG Animation Styles ===== */
+
+/* Dash Flow Animation */
+.dash-flow {
+  stroke-dasharray: 10 5;
+  animation: dashFlowAnim var(--animation-speed, 1s) linear infinite;
+}
+
+@keyframes dashFlowAnim {
+  0% {
+    stroke-dashoffset: 15;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Flow Particle Styles */
+.flow-particle {
+  filter: drop-shadow(0 0 3px #0ea5e9);
+}
+
+/* Animation Paused State */
+.animation-paused * {
+  animation-play-state: paused !important;
+}
+
+.animation-paused .flow-particle {
+  opacity: 0.5;
+}
+
+/* Mermaid SVG Enhancements */
+svg[id^="mermaid"] {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Edge path base styles */
+.edgePath path {
+  stroke-width: 2px;
+}
+
+/* Node styling enhancements */
+.node rect,
+.node circle,
+.node polygon {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
+
+/* Label styling */
+.edgeLabel {
+  background-color: #1e293b !important;
+}
