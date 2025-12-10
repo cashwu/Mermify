@@ -14,6 +14,11 @@ function App() {
   const [debouncedCode, setDebouncedCode] = useState(DEFAULT_MERMAID_CODE);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // 分隔條拖動狀態 - 預設 30% 給 code editor，70% 給 preview
+  const [leftPanelWidth, setLeftPanelWidth] = useState(30);
+  const isDraggingRef = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // 防抖處理
   const handleCodeChange = useCallback((newCode: string) => {
     setCode(newCode);
@@ -38,12 +43,49 @@ function App() {
     };
   }, []);
 
+  // 分隔條拖動處理
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current || !containerRef.current) return;
+
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const newWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+
+      // 限制範圍在 15% 到 70% 之間
+      setLeftPanelWidth(Math.min(70, Math.max(15, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
+
   return (
-    <div className="flex flex-col h-screen bg-slate-900">
+    <div className="flex flex-col h-full bg-slate-900">
       {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div ref={containerRef} className="flex-1 flex overflow-hidden min-h-0">
         {/* Left Panel - Code Editor */}
-        <div className="w-1/2 border-r border-slate-700 flex flex-col">
+        <div
+          className="flex flex-col min-w-0"
+          style={{ width: `${leftPanelWidth}%` }}
+        >
           <div className="px-4 py-2 bg-slate-800 border-b border-slate-700">
             <h2 className="text-sm font-medium text-slate-300">Mermaid Code</h2>
           </div>
@@ -52,8 +94,19 @@ function App() {
           </div>
         </div>
 
+        {/* Resizable Divider */}
+        <div
+          className="w-1 bg-slate-700 hover:bg-sky-500 cursor-col-resize transition-colors flex-shrink-0 relative group"
+          onMouseDown={handleMouseDown}
+        >
+          <div className="absolute inset-y-0 -left-1 -right-1 group-hover:bg-sky-500/20" />
+        </div>
+
         {/* Right Panel - Preview */}
-        <div className="w-1/2 flex flex-col bg-slate-900">
+        <div
+          className="flex flex-col bg-slate-900 min-w-0"
+          style={{ width: `${100 - leftPanelWidth}%` }}
+        >
           <div className="px-4 py-2 bg-slate-800 border-b border-slate-700">
             <h2 className="text-sm font-medium text-slate-300">Preview</h2>
           </div>

@@ -1,13 +1,47 @@
 import type { AnimationType } from '../../stores/animation-store';
 
 /**
+ * 取得所有 edge path 元素 - 支援多種 Mermaid 版本的 SVG 結構
+ */
+function getEdgePaths(svg: SVGElement): SVGPathElement[] {
+  // Mermaid 11.x 可能使用不同的選擇器
+  const selectors = [
+    '.edgePath path',
+    '.flowchart-link',
+    '.edge-pattern-solid',
+    '.edge-pattern-dotted',
+    'path.flowchart-link',
+    'g.edgePath > path',
+    '.edgePaths path',
+    // 更通用的選擇器 - 尋找連接線
+    'path[class*="edge"]',
+    'path[class*="link"]',
+    'path[marker-end]', // 有箭頭的路徑通常是連接線
+  ];
+
+  const paths: SVGPathElement[] = [];
+  const seen = new Set<Element>();
+
+  for (const selector of selectors) {
+    const elements = svg.querySelectorAll(selector);
+    elements.forEach((el) => {
+      if (el instanceof SVGPathElement && !seen.has(el)) {
+        seen.add(el);
+        paths.push(el);
+      }
+    });
+  }
+
+  return paths;
+}
+
+/**
  * 為 SVG 的 edge path 注入虛線流動動畫
  */
 export function injectDashAnimation(svg: SVGElement, speed: number = 1): void {
-  const edges = svg.querySelectorAll('.edgePath path');
+  const edges = getEdgePaths(svg);
 
-  edges.forEach((path) => {
-    const el = path as SVGPathElement;
+  edges.forEach((el) => {
     el.classList.add('dash-flow');
     el.style.setProperty('--animation-speed', `${1 / speed}s`);
   });
@@ -17,10 +51,9 @@ export function injectDashAnimation(svg: SVGElement, speed: number = 1): void {
  * 為 SVG 的 edge path 注入粒子移動動畫
  */
 export function injectParticleAnimation(svg: SVGElement, speed: number = 1): void {
-  const edges = svg.querySelectorAll('.edgePath path');
+  const edges = getEdgePaths(svg);
 
-  edges.forEach((path, index) => {
-    const el = path as SVGPathElement;
+  edges.forEach((el, index) => {
     const pathId = `edge-path-${index}-${Date.now()}`;
     el.setAttribute('id', pathId);
 

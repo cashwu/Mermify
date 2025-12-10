@@ -16,10 +16,10 @@ code {
 
 /* ===== SVG Animation Styles ===== */
 
-/* Dash Flow Animation */
+/* Dash Flow Animation - 虛線流動效果 */
 .dash-flow {
-  stroke-dasharray: 10 5;
-  animation: dashFlowAnim var(--animation-speed, 1s) linear infinite;
+  stroke-dasharray: 10 5 !important;
+  animation: dashFlowAnim var(--animation-speed, 1s) linear infinite !important;
 }
 
 @keyframes dashFlowAnim {
@@ -31,9 +31,10 @@ code {
   }
 }
 
-/* Flow Particle Styles */
+/* Flow Particle Styles - 粒子效果 */
 .flow-particle {
-  filter: drop-shadow(0 0 3px #0ea5e9);
+  filter: drop-shadow(0 0 6px #0ea5e9) drop-shadow(0 0 12px #0ea5e9);
+  z-index: 1000;
 }
 
 /* Animation Paused State */
@@ -51,19 +52,29 @@ svg[id^="mermaid"] {
   height: auto;
 }
 
-/* Edge path base styles */
-.edgePath path {
+/* Edge path base styles - 支援多種 Mermaid 版本 */
+.edgePath path,
+.flowchart-link,
+path.flowchart-link,
+.edge-pattern-solid,
+path[marker-end] {
   stroke-width: 2px;
 }
 
 /* Node styling enhancements */
 .node rect,
 .node circle,
-.node polygon {
+.node polygon,
+.flowchart-label rect,
+.nodes .node rect {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
 }
 
 /* Label styling */
 .edgeLabel {
   background-color: #1e293b !important;
+}
+
+.edgeLabel rect {
+  fill: #1e293b !important;
 }
