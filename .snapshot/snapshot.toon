@@ -1,0 +1,44 @@
+proj: mermify
+desc: mermaid diagram animation tool
+v: 1.0
+ts: 2025-12-11T00:00:00Z
+split: none
+tech:
+  lang: TypeScript
+  fw: React 19
+  ui: Tailwind CSS 4
+  router: TanStack Router
+  state: Zustand
+  editor: Monaco Editor
+  diagram: Mermaid.js 11
+  test: Vitest
+entry: src/main.tsx
+r[2]{route,handler,tables,tpl}:
+  GET /,__root.tsx>index.tsx,,Header+App
+  GET /,index.tsx>App,,CodeEditor+MermaidRenderer+PreviewControls+ZoomControls
+m.cmp[6]{name,path,desc,deps}:
+  Header,src/components/Header.tsx,app header with github link,lucide-react
+  CodeEditor,src/components/CodeEditor.tsx,monaco code editor wrapper,@monaco-editor/react
+  MermaidRenderer,src/components/MermaidRenderer.tsx,mermaid svg render with zoom/pan,mermaid-config|inject-animations|animation-store|themes
+  PreviewControls,src/components/PreviewControls.tsx,animation controls and export ui,animation-store|export-apng|themes
+  ZoomControls,src/components/ZoomControls.tsx,zoom in/out/reset controls,lucide-react
+  App,src/routes/index.tsx,main app with split pane layout,CodeEditor|MermaidRenderer|PreviewControls|ZoomControls
+m.lib[5]{name,path,desc,deps}:
+  inject-animations,src/lib/animations/inject-animations.ts,svg animation injection (dash+particle),animation-store|themes
+  export-apng,src/lib/export-apng.ts,apng export with frame capture,upng-js|fontkit|animation-store|themes
+  themes,src/lib/themes.ts,6 color themes (3 dark + 3 light),
+  mermaid-config,src/lib/mermaid-config.ts,mermaid init and theme config,mermaid|themes|animation-store
+  export-apng.test,src/lib/export-apng.test.ts,export util tests,vitest
+m.store[1]{name,path,desc,deps}:
+  animation-store,src/stores/animation-store.ts,animation state (play/speed/type/theme/look),zustand|themes
+m.types[1]{name,path,desc,deps}:
+  upng-js.d,src/types/upng-js.d.ts,upng-js type defs,
+cfg[5]: package.json,tsconfig.json,vite.config.ts,tailwind.config.js,.gitignore
+patterns[3]: Zustand Store,File-based Routing,Component Composition
+features[6]:
+  Monaco editor for mermaid code input
+  Live mermaid diagram preview with zoom/pan
+  CSS dash-flow animation on edges
+  SMIL particle animation along paths
+  6 color themes (dark/light variants)
+  APNG export with fontkit for hand-drawn style
