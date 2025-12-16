@@ -196,6 +196,7 @@ interface ExportOptions {
   animationType?: AnimationType; // 動畫類型：dash, particle, both
   theme?: ThemeName; // 主題配色
   look?: LookType; // 風格：classic, handDrawn
+  transparent?: boolean; // 透明背景
 }
 
 /**
@@ -296,7 +297,7 @@ export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan', look = 'classic' } = options;
+  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan', look = 'classic', transparent = false } = options;
   const fontFamily = look === 'handDrawn' ? 'Virgil, cursive' : 'Arial, sans-serif';
 
   // 如果是手繪風格，使用 fontkit 載入 Virgil 字型
@@ -306,9 +307,9 @@ export async function exportToAPNG(
     fontkitFont = await loadVirgilFontFontkit();
   }
 
-  // 使用主題配色決定背景色
+  // 使用主題配色決定背景色（透明模式則不使用背景）
   const themeColors = getTheme(theme);
-  const backgroundColor = options.backgroundColor || themeColors.background;
+  const backgroundColor = transparent ? null : (options.backgroundColor || themeColors.background);
   const totalFrames = Math.round(fps * duration);
   const frameDelay = 1000 / fps; // 毫秒
 
@@ -433,7 +434,7 @@ function prepareSvgForExport(
   svg: SVGSVGElement,
   _width: number,
   _height: number,
-  backgroundColor: string,
+  backgroundColor: string | null,
   viewBoxX: number,
   viewBoxY: number,
   viewBoxWidth: number,
@@ -451,12 +452,14 @@ function prepareSvgForExport(
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
   svg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
 
-  // 添加背景矩形
-  const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-  bgRect.setAttribute('width', '100%');
-  bgRect.setAttribute('height', '100%');
-  bgRect.setAttribute('fill', backgroundColor);
-  svg.insertBefore(bgRect, svg.firstChild);
+  // 只在非透明模式下添加背景矩形
+  if (backgroundColor) {
+    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    bgRect.setAttribute('width', '100%');
+    bgRect.setAttribute('height', '100%');
+    bgRect.setAttribute('fill', backgroundColor);
+    svg.insertBefore(bgRect, svg.firstChild);
+  }
 
   // 處理 foreignObject 中的文字 - 轉換為 SVG text 或 path（使用主題的文字顏色和指定字型）
   // 如果有 fontkit 字型，則將文字轉為 SVG 路徑，避免 canvas 字型載入問題
