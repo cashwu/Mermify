@@ -1,4 +1,4 @@
-import { Download, Play, Pause, Loader2, Circle, Layers, Palette, Pencil } from 'lucide-react';
+import { Download, Play, Pause, Loader2, Circle, Layers, Palette, Pencil, Grid3X3 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import { useAnimationStore } from '../stores/animation-store';
 import { exportToAPNG, downloadBlob } from '../lib/export-apng';
@@ -14,6 +14,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
+  const [transparentBg, setTransparentBg] = useState(false);
   const speedMenuRef = useRef<HTMLDivElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const { isPlaying, speed, animationType, theme, look, toggle, setSpeed, setType, setTheme, setLook } = useAnimationStore();
@@ -48,6 +49,7 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
         animationType, // 傳入目前選擇的動畫類型
         theme, // 傳入目前選擇的主題
         look, // 傳入目前選擇的風格
+        transparent: transparentBg, // 是否使用透明背景
       });
 
       const filename = `mermaid-animation-${Date.now()}.png`;
@@ -74,6 +76,19 @@ export function PreviewControls({ getSvgElement }: PreviewControlsProps) {
         ) : (
           <Download className="w-5 h-5 text-white" />
         )}
+      </button>
+
+      {/* 透明背景切換按鈕 */}
+      <button
+        onClick={() => setTransparentBg(!transparentBg)}
+        className={`w-10 h-10 flex items-center justify-center rounded-lg transition-colors border ${
+          transparentBg
+            ? 'bg-sky-600 border-sky-500 text-white'
+            : 'bg-slate-800/90 border-slate-600 text-slate-400 hover:bg-slate-700 hover:text-slate-300'
+        }`}
+        title={transparentBg ? '透明背景（點擊關閉）' : '透明背景（點擊開啟）'}
+      >
+        <Grid3X3 className="w-5 h-5" />
       </button>
 
       {/* 主題選擇器 */}
