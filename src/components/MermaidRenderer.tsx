@@ -159,17 +159,6 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
     }
   }, [speed]);
 
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full p-4">
-        <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 max-w-md">
-          <h3 className="text-red-400 font-semibold mb-2">Render Error</h3>
-          <pre className="text-red-300 text-sm whitespace-pre-wrap">{error}</pre>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div
       className="w-full h-full overflow-hidden relative transition-colors duration-200"
@@ -191,8 +180,17 @@ export const MermaidRenderer = forwardRef<MermaidRendererRef, MermaidRendererPro
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
           transformOrigin: 'center center',
           transition: isDragging ? 'none' : 'transform 0.1s ease-out',
+          visibility: error ? 'hidden' : 'visible',
         }}
       />
+      {error && (
+        <div className="absolute inset-0 flex items-center justify-center p-4">
+          <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 max-w-md">
+            <h3 className="text-red-400 font-semibold mb-2">Render Error</h3>
+            <pre className="text-red-300 text-sm whitespace-pre-wrap">{error}</pre>
+          </div>
+        </div>
+      )}
     </div>
   );
 })
