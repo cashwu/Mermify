@@ -236,22 +236,17 @@ export function parseViewBox(viewBox: string | null): ViewBoxDimensions | null {
 /**
  * 計算匯出尺寸
  *
- * 【重要】回傳的尺寸必須直接使用，不可縮放
- * 瀏覽器載入 SVG 為 Image 時會使用 viewBox 尺寸作為 naturalWidth/naturalHeight
- * 如果 Canvas 尺寸與 viewBox 不一致，會導致圖片變形或空白
- *
  * @param viewBox - 解析後的 viewBox 尺寸
- * @returns Canvas 應該使用的寬高
+ * @param scale - 縮放倍率（1, 2, 3）
+ * @returns Canvas 應該使用的寬高（已乘以 scale）
  */
-export function calculateExportDimensions(viewBox: ViewBoxDimensions): {
+export function calculateExportDimensions(viewBox: ViewBoxDimensions, scale: number = 1): {
   width: number;
   height: number;
 } {
-  // 【重要】直接使用 viewBox 尺寸，四捨五入為整數
-  // 不要乘以任何 scale 係數
   return {
-    width: Math.round(viewBox.width),
-    height: Math.round(viewBox.height),
+    width: Math.round(viewBox.width * scale),
+    height: Math.round(viewBox.height * scale),
   };
 }
 
@@ -280,24 +275,17 @@ export function validateExportSetup(
 /**
  * 將 SVG 元素匯出為 APNG 動畫圖片
  *
- * 【重要】關於尺寸處理的說明：
- * 瀏覽器將 SVG 載入為 Image 時，會使用 viewBox 的尺寸作為 naturalWidth/naturalHeight，
- * 而不是 SVG 元素上設定的 width/height 屬性。
- *
- * 因此，為了避免圖片變形或出現空白：
- * 1. Canvas 尺寸必須與 viewBox 尺寸一致
- * 2. SVG 的 width/height 屬性必須與 viewBox 尺寸一致
- * 3. 不要嘗試在這裡做縮放（scale），會導致圖片變形
- * 4. 繪製時直接使用 ctx.drawImage(img, 0, 0)，不指定目標尺寸
- *
- * 如果需要更高解析度的輸出，應該在 Mermaid 渲染時就設定較大的尺寸，
- * 而不是在匯出時縮放。
+ * 縮放原理：
+ * - viewBox 保持原始尺寸（內容座標系）
+ * - SVG 的 width/height 設為縮放後的尺寸
+ * - Canvas 尺寸與 SVG width/height 一致
+ * - 瀏覽器會自動將 viewBox 內容縮放到 width/height 尺寸
  */
 export async function exportToAPNG(
   svgElement: SVGSVGElement,
   options: ExportOptions = {}
 ): Promise<Blob> {
-  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan', look = 'classic', transparent = false } = options;
+  const { fps = 24, duration = 2, animationType = 'both', theme = 'dark-cyan', look = 'classic', transparent = false, scale = 1 } = options;
   const fontFamily = look === 'handDrawn' ? 'Virgil, cursive' : 'Arial, sans-serif';
 
   // 如果是手繪風格，使用 fontkit 載入 Virgil 字型
@@ -338,14 +326,13 @@ export async function exportToAPNG(
     contentHeight = bbox.height + padding * 2;
   }
 
-  // 【重要】使用 calculateExportDimensions 計算尺寸
-  // 此函數確保不會進行任何縮放
+  // 使用 calculateExportDimensions 計算尺寸（含縮放）
   const { width, height } = calculateExportDimensions({
     x: contentX,
     y: contentY,
     width: contentWidth,
     height: contentHeight,
-  });
+  }, scale);
 
   // 建立 canvas
   const canvas = document.createElement('canvas');
@@ -366,14 +353,14 @@ export async function exportToAPNG(
     // 為每一幀建立新的 SVG 克隆
     const clonedSvg = svgElement.cloneNode(true) as SVGSVGElement;
 
-    // 準備 SVG 以便匯出（不傳 scale，因為我們用原始尺寸）
-    prepareSvgForExport(clonedSvg, width, height, backgroundColor, contentX, contentY, contentWidth, contentHeight, themeColors, fontFamily, fontkitFont);
+    // 準備 SVG 以便匯出（使用原始尺寸，縮放由 canvas 處理）
+    prepareSvgForExport(clonedSvg, contentWidth, contentHeight, backgroundColor, contentX, contentY, contentWidth, contentHeight, themeColors, fontFamily, fontkitFont);
 
     // 更新動畫狀態
     updateAnimationFrame(clonedSvg, progress, duration, pathsInfo, animationType, themeColors);
 
-    // 將 SVG 轉換為圖片
-    const imageData = await svgToImageData(clonedSvg, width, height, ctx);
+    // 將 SVG 轉換為圖片（傳入 scale 讓 canvas 做縮放）
+    const imageData = await svgToImageData(clonedSvg, width, height, ctx, scale);
     frames.push(imageData.buffer as ArrayBuffer);
     delays.push(frameDelay);
   }
@@ -427,13 +414,13 @@ function extractPathsInfo(svg: SVGSVGElement): PathInfo[] {
 /**
  * 準備 SVG 以便匯出
  *
- * 【重要】SVG 的 width/height 必須與 viewBox 尺寸一致
- * 不要嘗試設定不同的 width/height 來縮放，這會導致圖片變形
+ * SVG 的 viewBox 和 width/height 都設為原始尺寸。
+ * 縮放由 canvas 的 ctx.scale() 處理，避免圖片變形。
  */
 function prepareSvgForExport(
   svg: SVGSVGElement,
-  _width: number,
-  _height: number,
+  width: number,
+  height: number,
   backgroundColor: string | null,
   viewBoxX: number,
   viewBoxY: number,
@@ -443,10 +430,10 @@ function prepareSvgForExport(
   fontFamily: string,
   fontkitFont: FontkitFont | null
 ): void {
-  // 【重要】viewBox 和 width/height 必須一致，否則會變形
+  // viewBox 保持原始尺寸，width/height 設為縮放後的尺寸
   svg.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxWidth} ${viewBoxHeight}`);
-  svg.setAttribute('width', String(viewBoxWidth));
-  svg.setAttribute('height', String(viewBoxHeight));
+  svg.setAttribute('width', String(width));
+  svg.setAttribute('height', String(height));
   // 移除 preserveAspectRatio 避免任何額外的縮放行為
   svg.removeAttribute('preserveAspectRatio');
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -455,8 +442,11 @@ function prepareSvgForExport(
   // 只在非透明模式下添加背景矩形
   if (backgroundColor) {
     const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    bgRect.setAttribute('width', '100%');
-    bgRect.setAttribute('height', '100%');
+    // 使用 viewBox 座標系的絕對值，確保背景覆蓋整個區域
+    bgRect.setAttribute('x', String(viewBoxX));
+    bgRect.setAttribute('y', String(viewBoxY));
+    bgRect.setAttribute('width', String(viewBoxWidth));
+    bgRect.setAttribute('height', String(viewBoxHeight));
     bgRect.setAttribute('fill', backgroundColor);
     svg.insertBefore(bgRect, svg.firstChild);
   }
@@ -661,15 +651,15 @@ function updateAnimationFrame(
 /**
  * 將 SVG 轉換為 ImageData（使用 data URL 避免跨域問題）
  *
- * 【重要】繪製時不要指定目標尺寸
- * 使用 ctx.drawImage(img, 0, 0) 而不是 ctx.drawImage(img, 0, 0, width, height)
- * 因為後者會強制縮放圖片，導致變形
+ * 使用 ctx.scale() 縮放座標系來實現高解析度輸出，
+ * 避免使用 drawImage 的目標尺寸參數導致變形。
  */
 async function svgToImageData(
   svg: SVGSVGElement,
   width: number,
   height: number,
-  ctx: CanvasRenderingContext2D
+  ctx: CanvasRenderingContext2D,
+  scale: number = 1
 ): Promise<Uint8ClampedArray> {
   return new Promise((resolve, reject) => {
     const svgData = new XMLSerializer().serializeToString(svg);
@@ -682,8 +672,11 @@ async function svgToImageData(
 
     img.onload = () => {
       ctx.clearRect(0, 0, width, height);
-      // 【重要】直接繪製，不指定目標尺寸，避免變形
+      // 使用 scale 縮放座標系，然後以原始尺寸繪製
+      ctx.save();
+      ctx.scale(scale, scale);
       ctx.drawImage(img, 0, 0);
+      ctx.restore();
 
       const imageData = ctx.getImageData(0, 0, width, height);
       resolve(imageData.data);
